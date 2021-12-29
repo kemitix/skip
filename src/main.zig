@@ -37,7 +37,7 @@ fn dumpInput(in: File, out: File) !void {
 }
 
 fn nextLine(reader: FileReader, buffer: []u8) !?[]const u8 {
-    var line = (try reader.readUntilDelimiterOrEof(
+    var line: []u8 = (try reader.readUntilDelimiterOrEof(
         buffer,
         '\n',
     )) orelse return null;
