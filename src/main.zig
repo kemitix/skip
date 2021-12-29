@@ -20,7 +20,7 @@ pub fn main() anyerror!void {
     try dumpInput(stdin, stdout);
 }
 
-const maxLineLength = 100;
+const maxLineLength = 4096;
 
 fn dumpInput(in: File, out: File) !void {
     var buffer: [maxLineLength]u8 = undefined;
