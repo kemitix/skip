@@ -41,13 +41,21 @@ fn nextLine(reader: FileReader, buffer: []u8) !?[]const u8 {
         buffer,
         '\n',
     )) orelse return null;
-    // trim annoying windows-only carriage return character
+    return windowsSafe(line);
+}
+
+// trim annoying windows-only carriage return character
+fn windowsSafe(line: []u8) []u8 {
     if (os.tag == .windows) {
-        line = mem.trimRight(u8, line, "\r");
+        return mem.trimRight(u8, line, "\r");
     }
     return line;
 }
 
-test "basic test" {
-    try testing.expectEqual(10, 3 + 7);
+test "windowsSage strips carriage return on windows" {
+    if (os.tag == .windows) {
+        try testing.expectEqualSlices(u8, "line\n\r", "line\n");
+    } else {
+        try testing.expectEqualSlices(u8, "line\n\r", "line\n\r");
+    }
 }
