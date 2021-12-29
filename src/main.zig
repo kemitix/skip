@@ -45,17 +45,21 @@ fn nextLine(reader: FileReader, buffer: []u8) !?[]const u8 {
 }
 
 // trim annoying windows-only carriage return character
-fn windowsSafe(line: []u8) []u8 {
+fn windowsSafe(line: []const u8) []const u8 {
     if (os.tag == .windows) {
         return mem.trimRight(u8, line, "\r");
     }
     return line;
 }
 
-test "windowsSage strips carriage return on windows" {
+test "windowsSafe strips carriage return on windows" {
+    const input = "line\n\r";
+    const result = windowsSafe(input);
     if (os.tag == .windows) {
-        try testing.expectEqualSlices(u8, "line\n\r", "line\n");
+        // strips the carriage return if windows
+        try testing.expectEqualSlices(u8, "line\n", result);
     } else {
-        try testing.expectEqualSlices(u8, "line\n\r", "line\n\r");
+        // doesn't change the line if not windows
+        try testing.expectEqualSlices(u8, input, result);
     }
 }
