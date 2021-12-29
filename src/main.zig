@@ -4,9 +4,8 @@ const os = builtin.os;
 const mem = std.mem;
 const testing = std.testing;
 const io = std.io;
+const heap = std.heap;
 const fs = std.fs;
-const File = fs.File;
-const FileReader = File.Reader;
 
 // step 1: [x] read in a file from stdin and write out to stdout
 // step 2: [ ] read in a named file in parameters and write out to stdout
@@ -17,32 +16,45 @@ const FileReader = File.Reader;
 pub fn main() anyerror!void {
     const stdin = io.getStdIn();
     const stdout = io.getStdOut();
-    try dumpInput(stdin, stdout);
+    var buffer: [4096]u8 = undefined;
+    var fba = heap.FixedBufferAllocator.init(&buffer);
+    const allocator = fba.allocator();
+    try dumpInput(stdin, stdout, allocator);
 }
 
 const maxLineLength = 4096;
 
-fn dumpInput(in: File, out: File) !void {
-    var buffer: [maxLineLength]u8 = undefined;
+fn dumpInput(in: fs.File, out: fs.File, allocator: mem.Allocator) !void {
     const writer = out.writer();
     const reader = in.reader();
-    while (true) {
-        const input = try nextLine(reader, &buffer);
-        if (input) |line| {
-            try writer.print("{s}\n", .{ line });
-        } else {
-            break;
-        }
+    var it = lineIterator(reader, allocator);
+    while (it.next()) |line| {
+        defer allocator.free(line);
+        
+        try writer.print("{s}\n", .{ windowsSafe(line) });
     }
 }
 
-fn nextLine(reader: FileReader, buffer: []u8) !?[]const u8 {
-    var line: []u8 = (try reader.readUntilDelimiterOrEof(
-        buffer,
-        '\n',
-    )) orelse return null;
-    return windowsSafe(line);
+fn lineIterator(reader: fs.File.Reader, allocator: mem.Allocator) LineIterator {
+    return LineIterator {
+        .reader = io.bufferedReader(reader),
+        .delimiter = '\n',
+        .allocator = allocator
+    };
 }
+
+const LineIterator = struct {
+    reader: std.io.BufferedReader(4096, fs.File.Reader),
+    delimiter: u8,
+    allocator: mem.Allocator,
+
+    const Self = @This();
+
+    /// Caller owns returned memory
+    pub fn next(self: *Self) ?[]u8 {
+        return self.reader.reader().readUntilDelimiterOrEofAlloc(self.allocator, self.delimiter, 4096) catch null;
+    }
+};
 
 // trim annoying windows-only carriage return character
 fn windowsSafe(line: []const u8) []const u8 {
