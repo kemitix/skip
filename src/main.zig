@@ -10,7 +10,7 @@ const fs = std.fs;
 const clap = @import("clap");
 
 // step 1: [x] read in a file from stdin and write out to stdout
-// step 2: [ ] read in a named file in parameters and write out to stdout
+// step 2: [x] read in a named file in parameters and write out to stdout
 // step 3: [ ] skip a number of lines
 // step 4: [ ] skip a number of matching lines
 // step 5: [ ] skip a number of tokens
@@ -20,20 +20,32 @@ pub fn main() anyerror!void {
     var fba = heap.FixedBufferAllocator.init(&buffer);
     const allocator = fba.allocator();
 
-    const config: Config = try parseArgs();
-    _ = config;
+    const config: Config = try parseArgs(allocator);
+    defer config.deinit();
 
-    const stdin = io.getStdIn();
     const stdout = io.getStdOut();
-    try dumpInput(stdin, stdout, allocator);
+    if (config.file) |fileName| {
+        const file = try fs.cwd().openFile(fileName, .{ .read = true, .write = false });
+        try dumpInput(config, file, stdout, allocator);
+    } else {
+        const stdin = io.getStdIn();
+        try dumpInput(config, stdin, stdout, allocator);
+    }
 }
 
 const Config = struct {
     lines: u32,
-    file: ?[]const u8
+    file: ?[]const u8,
+    allocator: mem.Allocator,
+
+    pub fn deinit(self: @This()) void {
+        if (self.file) |f| {
+            self.allocator.free(f);
+        }
+    }
 };
 
-fn parseArgs() !Config {
+fn parseArgs(allocator: mem.Allocator) !Config {
     const params = comptime [_]clap.Param(clap.Help) {
         clap.parseParam("N      The number of lines to skip") catch unreachable,
         clap.parseParam("[FILE] The file to read or stdin if not given") catch unreachable
@@ -51,20 +63,25 @@ fn parseArgs() !Config {
         n = try fmt.parseInt(u32, args.positionals()[0], 10);
     }
     if (args.positionals().len >= 2) {
-        file = args.positionals()[1];
+        file = try allocator.dupe(u8, args.positionals()[1]);
     }
     return Config {
         .lines = n,
-        .file = file
+        .file = file,
+        .allocator = allocator,
     };
 }
 
 const maxLineLength = 4096;
 
-fn dumpInput(in: fs.File, out: fs.File, allocator: mem.Allocator) !void {
+fn dumpInput(config: Config, in: fs.File, out: fs.File, allocator: mem.Allocator) !void {
     const writer = out.writer();
     const reader = in.reader();
     var it: LineIterator = lineIterator(reader, allocator);
+    var c: u32 = 0;
+    while (c < config.lines) : (c += 1) {
+        _ = it.next() orelse return;
+    }
     try pumpIterator(&it, writer, allocator);
 }
 
