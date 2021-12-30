@@ -3,3 +3,4 @@ name: skip
 license: MIT
 description: skip part of a file 
 dev_dependencies:
+    - src: git https://github.com/Hejsil/zig-clap
