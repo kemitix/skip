@@ -22,15 +22,14 @@ pub fn main() anyerror!void {
     var fba = heap.FixedBufferAllocator.init(&buffer);
     const allocator = fba.allocator();
 
-    const config: Config = parseArgs(allocator) catch |err| switch (err) {
+    const config: Config = parseArgs() catch |err| switch (err) {
         error.EarlyExit => return,
         else => @panic("Unknown error"),
     };
     defer config.deinit();
 
     const stdout = io.getStdOut();
-    if (config.file) |fileName| {
-        const file = try fs.cwd().openFile(fileName, .{ .read = true, .write = false });
+    if (config.file) |file| {
         try dumpInput(config, file, stdout, allocator);
     } else {
         const stdin = io.getStdIn();
@@ -44,17 +43,16 @@ const errors = error {
 
 const Config = struct {
     lines: u32,
-    file: ?[]const u8,
-    allocator: mem.Allocator,
+    file: ?fs.File,
 
     pub fn deinit(self: @This()) void {
         if (self.file) |f| {
-            self.allocator.free(f);
+            f.close();
         }
     }
 };
 
-fn parseArgs(allocator: mem.Allocator) !Config {
+fn parseArgs() !Config {
     const params = comptime [_]clap.Param(clap.Help) {
         clap.parseParam("<N>           The number of lines to skip") catch unreachable,
         clap.parseParam("[<FILE>]      The file to read or stdin if not given") catch unreachable,
@@ -79,7 +77,7 @@ fn parseArgs(allocator: mem.Allocator) !Config {
     }
 
     var n: u32 = 0;
-    var file: ?[]const u8 = null;
+    var file: ?fs.File = null;
     if (args.positionals().len == 0) {
         std.debug.print("Number of lines to skip not given. Try skip --help\n", .{});
         return error.EarlyExit;
@@ -88,12 +86,12 @@ fn parseArgs(allocator: mem.Allocator) !Config {
         n = try fmt.parseInt(u32, args.positionals()[0], 10);
     }
     if (args.positionals().len >= 2) {
-        file = try allocator.dupe(u8, args.positionals()[1]);
+        const filename = args.positionals()[1];
+        file = try fs.cwd().openFile(filename, .{ .read = true, .write = false });
     }
     return Config {
         .lines = n,
         .file = file,
-        .allocator = allocator,
     };
 }
 
@@ -105,9 +103,41 @@ fn dumpInput(config: Config, in: fs.File, out: fs.File, allocator: mem.Allocator
     var it: LineIterator = lineIterator(reader, allocator);
     var c: u32 = 0;
     while (c < config.lines) : (c += 1) {
-        _ = it.next() orelse return;
+        const line = it.next();
+        if (line) |memory| {
+            allocator.free(memory);
+        } else return;
     }
     try pumpIterator(&it, writer, allocator);
+}
+
+test "dumpInput" {
+    const file = try fs.cwd().openFile("src/test/two-lines.txt", .{ .read = true, .write = false });
+    defer file.close();
+
+    const tempFile = "zig-cache/test.txt";
+
+    const output = try fs.cwd().createFile(tempFile, .{});
+    defer output.close();
+
+    const config = Config{
+        .lines = 1,
+        .file = file,
+    };
+
+    try dumpInput(config, file, output, testing.allocator);
+
+    const result = try fs.cwd().openFile(tempFile, .{ .read = true });
+    defer result.close();
+
+    var rit = lineIterator(result.reader(), testing.allocator);
+
+    const line1 = rit.next().?;
+    defer testing.allocator.free(line1);
+    try testing.expectEqualStrings("line 2", line1);
+
+    const eof = rit.next();
+    try testing.expect(eof == null);
 }
 
 fn pumpIterator(it: *LineIterator, writer: fs.File.Writer, allocator: mem.Allocator) !void {
