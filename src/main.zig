@@ -27,6 +27,7 @@ pub fn main() anyerror!void {
     const config: Config = parseArgs(allocator) catch |err| switch (err) {
         error.EarlyExit => return,
         error.FileNotFound => return,
+        error.BadArgs => return,
         else => @panic("Unknown error"),
     };
     defer config.deinit();
@@ -42,13 +43,15 @@ pub fn main() anyerror!void {
 
 const errors = error {
     EarlyExit,
-    FileNotFound
+    FileNotFound,
+    BadArgs,
 };
 
 const Config = struct {
     lines: u32,
     file: ?fs.File,
     line: ?[]const u8 = null,
+    token: ?[]const u8 = null,
 
     pub fn deinit(self: @This()) void {
         if (self.file) |f| {
@@ -59,11 +62,12 @@ const Config = struct {
 
 fn parseArgs(allocator: mem.Allocator) !Config {
     const params = comptime [_]clap.Param(clap.Help) {
-        clap.parseParam("<N>              The number of lines to skip") catch unreachable,
-        clap.parseParam("[<FILE>]         The file to read or stdin if not given") catch unreachable,
-        clap.parseParam("-l, --line <STR> Skip until N lines matching this") catch unreachable,
-        clap.parseParam("-h, --help       Display this help and exit") catch unreachable,
-        clap.parseParam("-v, --version    Display the version") catch unreachable,
+        clap.parseParam("<N>               The number of lines to skip") catch unreachable,
+        clap.parseParam("[<FILE>]          The file to read or stdin if not given") catch unreachable,
+        clap.parseParam("-l, --line <STR>  Skip until N lines matching this") catch unreachable,
+        clap.parseParam("-t, --token <STR> Skip lines until N tokens found") catch unreachable,
+        clap.parseParam("-h, --help        Display this help and exit") catch unreachable,
+        clap.parseParam("-v, --version     Display the version") catch unreachable,
     };
     var diag = clap.Diagnostic{};
     var args = clap.parse(clap.Help, &params, .{ .diagnostic = &diag }) catch |err| {
@@ -81,9 +85,23 @@ fn parseArgs(allocator: mem.Allocator) !Config {
         try clap.help(io.getStdErr().writer(), &params);
         return error.EarlyExit;
     }
+
+    if (args.option("--line")) |_| {
+        if (args.option("--token")) |_| {
+            try io.getStdErr().writer().print("Error: only specify one of --line or --token, not both\n", .{});
+            return error.BadArgs;
+        }
+    }
+
+
     var line: ?[]const u8 = null;
     if (args.option("--line")) |match| {
         line = try allocator.dupe(u8, match);
+    }
+
+    var token: ?[]const u8 = null;
+    if (args.option("--token")) |match| {
+        token = try allocator.dupe(u8, match);
     }
 
     var n: u32 = 0;
@@ -109,6 +127,7 @@ fn parseArgs(allocator: mem.Allocator) !Config {
         .lines = n,
         .file = file,
         .line = line,
+        .token = token,
     };
 }
 
@@ -116,7 +135,7 @@ fn dumpInput(config: Config, in: fs.File, out: fs.File, allocator: mem.Allocator
     const writer = out.writer();
     const reader = in.reader();
     var it: LineIterator = lineIterator(reader, allocator);
-    var c: u32 = 0;
+    var c: usize = 0;
     while (c < config.lines) {
         const line = it.next();
         if (config.line) |match| {
@@ -126,7 +145,13 @@ fn dumpInput(config: Config, in: fs.File, out: fs.File, allocator: mem.Allocator
                 }
             }
         } else {
-            c += 1;
+            if (config.token) |token| {
+                if (line) |memory| {
+                    c += mem.count(u8, memory, token);
+                }
+            } else {
+                c += 1;
+            }
         }
         if (line) |memory| {
             allocator.free(memory);
