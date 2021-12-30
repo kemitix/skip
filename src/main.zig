@@ -35,6 +35,19 @@ fn dumpInput(in: fs.File, out: fs.File, allocator: mem.Allocator) !void {
     }
 }
 
+const LineIterator = struct {
+    reader: io.BufferedReader(4096, fs.File.Reader),
+    delimiter: u8,
+    allocator: mem.Allocator,
+
+    const Self = @This();
+
+    /// Caller owns returned memory
+    pub fn next(self: *Self) ?[]u8 {
+        return self.reader.reader().readUntilDelimiterOrEofAlloc(self.allocator, self.delimiter, 4096) catch null;
+    }
+};
+
 fn lineIterator(reader: fs.File.Reader, allocator: mem.Allocator) LineIterator {
     return LineIterator {
         .reader = io.bufferedReader(reader),
@@ -61,19 +74,6 @@ test "lineIterator returns lines in buffer" {
 
     try testing.expect(eof == null);
 }
-
-const LineIterator = struct {
-    reader: io.BufferedReader(4096, fs.File.Reader),
-    delimiter: u8,
-    allocator: mem.Allocator,
-
-    const Self = @This();
-
-    /// Caller owns returned memory
-    pub fn next(self: *Self) ?[]u8 {
-        return self.reader.reader().readUntilDelimiterOrEofAlloc(self.allocator, self.delimiter, 4096) catch null;
-    }
-};
 
 // trim annoying windows-only carriage return character
 fn windowsSafe(line: []const u8) []const u8 {
