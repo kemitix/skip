@@ -9,9 +9,11 @@ const heap = std.heap;
 const fs = std.fs;
 const clap = @import("clap");
 
+const version = "0.1.0";
+
 // step 1: [x] read in a file from stdin and write out to stdout
 // step 2: [x] read in a named file in parameters and write out to stdout
-// step 3: [ ] skip a number of lines
+// step 3: [x] skip a number of lines
 // step 4: [ ] skip a number of matching lines
 // step 5: [ ] skip a number of tokens
 
@@ -20,7 +22,10 @@ pub fn main() anyerror!void {
     var fba = heap.FixedBufferAllocator.init(&buffer);
     const allocator = fba.allocator();
 
-    const config: Config = try parseArgs(allocator);
+    const config: Config = parseArgs(allocator) catch |err| switch (err) {
+        error.EarlyExit => return,
+        else => @panic("Unknown error"),
+    };
     defer config.deinit();
 
     const stdout = io.getStdOut();
@@ -32,6 +37,10 @@ pub fn main() anyerror!void {
         try dumpInput(config, stdin, stdout, allocator);
     }
 }
+
+const errors = error {
+    EarlyExit
+};
 
 const Config = struct {
     lines: u32,
@@ -47,8 +56,10 @@ const Config = struct {
 
 fn parseArgs(allocator: mem.Allocator) !Config {
     const params = comptime [_]clap.Param(clap.Help) {
-        clap.parseParam("N      The number of lines to skip") catch unreachable,
-        clap.parseParam("[FILE] The file to read or stdin if not given") catch unreachable
+        clap.parseParam("<N>           The number of lines to skip") catch unreachable,
+        clap.parseParam("[<FILE>]      The file to read or stdin if not given") catch unreachable,
+        clap.parseParam("-h, --help    Display this help and exit") catch unreachable,
+        clap.parseParam("-v, --version Display the version") catch unreachable,
     };
     var diag = clap.Diagnostic{};
     var args = clap.parse(clap.Help, &params, .{ .diagnostic = &diag }) catch |err| {
@@ -57,8 +68,22 @@ fn parseArgs(allocator: mem.Allocator) !Config {
     };
     defer args.deinit();
 
+    if (args.flag("--version")) {
+        std.debug.print("skip version {s}\n", .{ version });
+        return error.EarlyExit;
+    }
+    if (args.flag("--help")) {
+        try io.getStdErr().writer().print("skip <N> [<FILE>] [-h|--help] [-v|--version]\n", .{});
+        try clap.help(io.getStdErr().writer(), &params);
+        return error.EarlyExit;
+    }
+
     var n: u32 = 0;
     var file: ?[]const u8 = null;
+    if (args.positionals().len == 0) {
+        std.debug.print("Number of lines to skip not given. Try skip --help\n", .{});
+        return error.EarlyExit;
+    }
     if (args.positionals().len >= 1) {
         n = try fmt.parseInt(u32, args.positionals()[0], 10);
     }
