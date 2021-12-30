@@ -1,11 +1,13 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const os = builtin.os;
+const fmt = std.fmt;
 const mem = std.mem;
 const testing = std.testing;
 const io = std.io;
 const heap = std.heap;
 const fs = std.fs;
+const clap = @import("clap");
 
 // step 1: [x] read in a file from stdin and write out to stdout
 // step 2: [ ] read in a named file in parameters and write out to stdout
@@ -14,12 +16,47 @@ const fs = std.fs;
 // step 5: [ ] skip a number of tokens
 
 pub fn main() anyerror!void {
-    const stdin = io.getStdIn();
-    const stdout = io.getStdOut();
     var buffer: [4096]u8 = undefined;
     var fba = heap.FixedBufferAllocator.init(&buffer);
     const allocator = fba.allocator();
+
+    const config: Config = try parseArgs();
+    _ = config;
+
+    const stdin = io.getStdIn();
+    const stdout = io.getStdOut();
     try dumpInput(stdin, stdout, allocator);
+}
+
+const Config = struct {
+    lines: u32,
+    file: ?[]const u8
+};
+
+fn parseArgs() !Config {
+    const params = comptime [_]clap.Param(clap.Help) {
+        clap.parseParam("N      The number of lines to skip") catch unreachable,
+        clap.parseParam("[FILE] The file to read or stdin if not given") catch unreachable
+    };
+    var diag = clap.Diagnostic{};
+    var args = clap.parse(clap.Help, &params, .{ .diagnostic = &diag }) catch |err| {
+        diag.report(io.getStdErr().writer(), err) catch {};
+        return err;
+    };
+    defer args.deinit();
+
+    var n: u32 = 0;
+    var file: ?[]const u8 = null;
+    if (args.positionals().len >= 1) {
+        n = try fmt.parseInt(u32, args.positionals()[0], 10);
+    }
+    if (args.positionals().len >= 2) {
+        file = args.positionals()[1];
+    }
+    return Config {
+        .lines = n,
+        .file = file
+    };
 }
 
 const maxLineLength = 4096;
