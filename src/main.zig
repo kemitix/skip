@@ -122,7 +122,9 @@ test "pumpIterator" {
     const file = try fs.cwd().openFile("src/test/two-lines.txt", .{ .read = true, .write = false });
     defer file.close();
 
-    const output = try fs.cwd().createFile("zig-out/test.txt", .{});
+    const tempFile = "zig-cache/test.txt";
+
+    const output = try fs.cwd().createFile(tempFile, .{});
     defer output.close();
 
     var reader = file.reader();
@@ -132,7 +134,7 @@ test "pumpIterator" {
 
     try pumpIterator(&it, writer, testing.allocator);
 
-    const result = try fs.cwd().openFile("zig-out/test.txt", .{ .read = true });
+    const result = try fs.cwd().openFile(tempFile, .{ .read = true });
     defer result.close();
 
     var rit = lineIterator(result.reader(), testing.allocator);
