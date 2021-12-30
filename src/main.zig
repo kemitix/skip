@@ -27,12 +27,47 @@ const maxLineLength = 4096;
 fn dumpInput(in: fs.File, out: fs.File, allocator: mem.Allocator) !void {
     const writer = out.writer();
     const reader = in.reader();
-    var it = lineIterator(reader, allocator);
+    var it: LineIterator = lineIterator(reader, allocator);
+    try pumpIterator(&it, writer, allocator);
+}
+
+fn pumpIterator(it: *LineIterator, writer: fs.File.Writer, allocator: mem.Allocator) !void {
     while (it.next()) |line| {
         defer allocator.free(line);
         
         try writer.print("{s}\n", .{ windowsSafe(line) });
     }
+}
+
+test "pumpIterator" {
+    const file = try fs.cwd().openFile("src/test/two-lines.txt", .{ .read = true, .write = false });
+    defer file.close();
+
+    const output = try fs.cwd().createFile("zig-out/test.txt", .{});
+    defer output.close();
+
+    var reader = file.reader();
+    var it = lineIterator(reader, testing.allocator);
+
+    var writer = output.writer();
+
+    try pumpIterator(&it, writer, testing.allocator);
+
+    const result = try fs.cwd().openFile("zig-out/test.txt", .{ .read = true });
+    defer result.close();
+
+    var rit = lineIterator(result.reader(), testing.allocator);
+
+    const line1 = rit.next().?;
+    defer testing.allocator.free(line1);
+    try testing.expectEqualStrings("line 1", line1);
+
+    const line2 = rit.next().?;
+    defer testing.allocator.free(line2);
+    try testing.expectEqualStrings("line 2", line2);
+    const eof = rit.next();
+
+    try testing.expect(eof == null);
 }
 
 const LineIterator = struct {
@@ -75,8 +110,8 @@ test "lineIterator returns lines in buffer" {
     try testing.expect(eof == null);
 }
 
-// trim annoying windows-only carriage return character
 fn windowsSafe(line: []const u8) []const u8 {
+    // trim annoying windows-only carriage return character
     if (os.tag == .windows) {
         return mem.trimRight(u8, line, "\r");
     }
