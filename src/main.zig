@@ -17,8 +17,10 @@ const version = "0.1.0";
 // step 4: [ ] skip a number of matching lines
 // step 5: [ ] skip a number of tokens
 
+const maxLineLength = 4096;
+
 pub fn main() anyerror!void {
-    var buffer: [4096]u8 = undefined;
+    var buffer: [maxLineLength]u8 = undefined;
     var fba = heap.FixedBufferAllocator.init(&buffer);
     const allocator = fba.allocator();
 
@@ -94,8 +96,6 @@ fn parseArgs() !Config {
         .file = file,
     };
 }
-
-const maxLineLength = 4096;
 
 fn dumpInput(config: Config, in: fs.File, out: fs.File, allocator: mem.Allocator) !void {
     const writer = out.writer();
@@ -182,7 +182,7 @@ test "pumpIterator" {
 }
 
 const LineIterator = struct {
-    reader: io.BufferedReader(4096, fs.File.Reader),
+    reader: io.BufferedReader(maxLineLength, fs.File.Reader),
     delimiter: u8,
     allocator: mem.Allocator,
 
@@ -190,7 +190,7 @@ const LineIterator = struct {
 
     /// Caller owns returned memory
     pub fn next(self: *Self) ?[]u8 {
-        return self.reader.reader().readUntilDelimiterOrEofAlloc(self.allocator, self.delimiter, 4096) catch null;
+        return self.reader.reader().readUntilDelimiterOrEofAlloc(self.allocator, self.delimiter, maxLineLength) catch null;
     }
 };
 
