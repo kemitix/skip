@@ -43,8 +43,27 @@ fn lineIterator(reader: fs.File.Reader, allocator: mem.Allocator) LineIterator {
     };
 }
 
+test "lineIterator returns lines in buffer" {
+    const file = try fs.cwd().openFile("src/test/two-lines.txt", .{ .read = true, .write = false });
+    defer file.close();
+
+    var reader = file.reader();
+    var it = lineIterator(reader, testing.allocator);
+
+    const line1 = it.next().?;
+    defer testing.allocator.free(line1);
+    try testing.expectEqualStrings("line 1", line1);
+
+    const line2 = it.next().?;
+    defer testing.allocator.free(line2);
+    try testing.expectEqualStrings("line 2", line2);
+    const eof = it.next();
+
+    try testing.expect(eof == null);
+}
+
 const LineIterator = struct {
-    reader: std.io.BufferedReader(4096, fs.File.Reader),
+    reader: io.BufferedReader(4096, fs.File.Reader),
     delimiter: u8,
     allocator: mem.Allocator,
 
