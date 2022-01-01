@@ -2,6 +2,9 @@
 
 set -e
 
+echo "zigmod"
+zigmod ci
+
 echo "Unit tests..."
 zig build test
 
