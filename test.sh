@@ -26,9 +26,15 @@ cat<<EOF > test.in
 alpha
 beta
 alpha
+alpha
 gamma
+alpha
 EOF
-echo "gamma" > test.expect
+cat<<EOF > test.expect
+alpha
+gamma
+alpha
+EOF
 ./skip 2 test.in --line alpha > test.out
 diff --brief test.expect test.out
 
