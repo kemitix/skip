@@ -58,6 +58,13 @@ EOF
 ./skip 2 test.in --token dolor > test.out
 diff --brief test.expect test.out
 
+echo "> handle unknown parameter with simple error message"
+cat<<EOF > test.expect
+Invalid argument '--foo'
+EOF
+./skip --foo  > test.out 2>&1 || ## error is expected
+diff --brief test.expect test.out
+
 rm test.in test.out test.expect
 
 echo done
