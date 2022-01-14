@@ -11,12 +11,6 @@ const clap = @import("clap");
 
 const version = "0.1.0";
 
-// step 1: [x] read in a file from stdin and write out to stdout
-// step 2: [x] read in a named file in parameters and write out to stdout
-// step 3: [x] skip a number of lines
-// step 4: [ ] skip a number of matching lines
-// step 5: [ ] skip a number of tokens
-
 const maxLineLength = 4096;
 
 pub fn main() anyerror!void {
