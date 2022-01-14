@@ -153,7 +153,11 @@ fn dumpInput(config: Config, in: fs.File, out: fs.File, allocator: mem.Allocator
         } else {
             if (config.token) |token| {
                 if (line) |memory| {
-                    c += mem.count(u8, memory, token);
+                    if (config.ignoreExtras) {
+                        c += 1;
+                    } else {
+                        c += mem.count(u8, memory, token);
+                    }
                 }
             } else {
                 c += 1;
