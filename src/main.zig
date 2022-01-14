@@ -66,7 +66,7 @@ fn parseArgs(allocator: mem.Allocator) !Config {
     var diag = clap.Diagnostic{};
     var args = clap.parse(clap.Help, &params, .{ .diagnostic = &diag }) catch |err| {
         diag.report(io.getStdErr().writer(), err) catch {};
-        return err;
+        return error.EarlyExit;
     };
     defer args.deinit();
 
