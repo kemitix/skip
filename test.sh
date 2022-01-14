@@ -11,6 +11,7 @@ EOF
 echo "line 2" > test.expect
 echo "$INPUT" | ./skip 1 > test.out
 diff --brief test.expect test.out
+rm test.expect test.out
 
 echo "> skip a line when reading from a file"
 cat<<EOF > test.in
@@ -20,6 +21,7 @@ EOF
 echo "line 2" > test.expect
 ./skip 1 test.in > test.out
 diff --brief test.expect test.out
+rm test.expect test.out
 
 echo "> skip until 2 matching lines seen"
 cat<<EOF > test.in
@@ -37,6 +39,7 @@ alpha
 EOF
 ./skip 2 test.in --line alpha > test.out
 diff --brief test.expect test.out
+rm test.in test.expect test.out
 
 echo "> skip lines until 2 tokens seen"
 cat<<EOF > test.in
@@ -55,15 +58,22 @@ quis nostrud exercitation ullamco
 laboris nisi ut aliquip ex ea 
 commodo consequat. 
 EOF
-./skip 2 test.in --token dolor > test.out
+./skip 2 test.in --token dolor > test.out 2
 diff --brief test.expect test.out
+rm test.in test.expect test.out
 
 echo "> handle unknown parameter with simple error message"
-cat<<EOF > test.expect
+cat<<EOF > test.expect.err
 Invalid argument '--foo'
 EOF
-./skip --foo  > test.out 2>&1 || ## error is expected
+cat<<EOF > test.expect
+EOF
+touch test.out test.err
+./skip --foo > test.out 2> test.err
 diff --brief test.expect test.out
+diff --brief test.expect.err test.err
+rm test.expect test.out
+rm test.expect.err test.err
 
 echo "> skip lines until 3 tokens seen - ignored extra tokens on same line"
 cat<<EOF > test.in
@@ -83,7 +93,6 @@ commodo consequat.
 EOF
 ./skip 3 test.in --token m --ignore-extras > test.out
 diff --brief test.expect test.out
-
-rm test.in test.out test.expect
+rm test.in test.expect test.out
 
 echo done
