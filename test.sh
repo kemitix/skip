@@ -65,6 +65,25 @@ EOF
 ./skip --foo  > test.out 2>&1 || ## error is expected
 diff --brief test.expect test.out
 
+echo "> skip lines until 3 tokens seen - ignored extra tokens on same line"
+cat<<EOF > test.in
+Lorem ipsum dolor sit amet, 
+consectetur adipiscing elit, 
+sed do eiusmod tempor incididunt 
+ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, 
+quis nostrud exercitation ullamco 
+laboris nisi ut aliquip ex ea 
+commodo consequat. 
+EOF
+cat<<EOF > test.expect
+quis nostrud exercitation ullamco 
+laboris nisi ut aliquip ex ea 
+commodo consequat. 
+EOF
+./skip 3 test.in --token m --ignore-extras > test.out
+diff --brief test.expect test.out
+
 rm test.in test.out test.expect
 
 echo done
