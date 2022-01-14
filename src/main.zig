@@ -46,6 +46,7 @@ const Config = struct {
     file: ?fs.File,
     line: ?[]const u8 = null,
     token: ?[]const u8 = null,
+    ignoreExtras: bool,
 
     pub fn deinit(self: @This()) void {
         if (self.file) |f| {
@@ -56,17 +57,18 @@ const Config = struct {
 
 fn parseArgs(allocator: mem.Allocator) !Config {
     const params = comptime [_]clap.Param(clap.Help) {
-        clap.parseParam("<N>               The number of lines to skip") catch unreachable,
-        clap.parseParam("[<FILE>]          The file to read or stdin if not given") catch unreachable,
-        clap.parseParam("-l, --line <STR>  Skip until N lines matching this") catch unreachable,
-        clap.parseParam("-t, --token <STR> Skip lines until N tokens found") catch unreachable,
-        clap.parseParam("-h, --help        Display this help and exit") catch unreachable,
-        clap.parseParam("-v, --version     Display the version") catch unreachable,
+        clap.parseParam("<N>                 The number of lines to skip") catch unreachable,
+        clap.parseParam("[<FILE>]            The file to read or stdin if not given") catch unreachable,
+        clap.parseParam("-l, --line <STR>    Skip until N lines matching this") catch unreachable,
+        clap.parseParam("-t, --token <STR>   Skip lines until N tokens found") catch unreachable,
+        clap.parseParam("-i, --ignore-extras Only count the first token on each line") catch unreachable,
+        clap.parseParam("-h, --help          Display this help and exit") catch unreachable,
+        clap.parseParam("-v, --version       Display the version") catch unreachable,
     };
     var diag = clap.Diagnostic{};
     var args = clap.parse(clap.Help, &params, .{ .diagnostic = &diag }) catch |err| {
         diag.report(io.getStdErr().writer(), err) catch {};
-        return error.EarlyExit;
+        return error.BadArgs;
     };
     defer args.deinit();
 
@@ -97,6 +99,15 @@ fn parseArgs(allocator: mem.Allocator) !Config {
     if (args.option("--token")) |match| {
         token = try allocator.dupe(u8, match);
     }
+    var ignoreExtras: bool = false;
+    if (args.flag("--ignore-extras")) {
+        if (token) |_| {
+            ignoreExtras = true;
+        } else {
+            try io.getStdErr().writer().print("Error: --ignore-extras requires --token\n", .{});
+            return error.BadArgs;
+        }
+    }
 
     var n: u32 = 0;
     var file: ?fs.File = null;
@@ -122,6 +133,7 @@ fn parseArgs(allocator: mem.Allocator) !Config {
         .file = file,
         .line = line,
         .token = token,
+        .ignoreExtras = ignoreExtras,
     };
 }
 

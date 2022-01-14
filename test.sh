@@ -75,6 +75,19 @@ diff --brief test.expect.err test.err
 rm test.expect test.out
 rm test.expect.err test.err
 
+echo "> handle ignore-extra when token is missing"
+cat<<EOF > test.expect.err
+Error: --ignore-extras requires --token
+EOF
+cat<<EOF > test.expect
+EOF
+touch test.out test.err
+./skip --ignore-extras > test.out 2> test.err
+diff --brief test.expect test.out
+diff --brief test.expect.err test.err
+rm test.expect test.out
+rm test.expect.err test.err
+
 echo "> skip lines until 3 tokens seen - ignored extra tokens on same line"
 cat<<EOF > test.in
 Lorem ipsum dolor sit amet, 
