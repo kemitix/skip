@@ -2,6 +2,14 @@
 
 set -e
 
+SKIP="./zig-out/bin/skip"
+DIFF="diff -u"
+
+if test ! -x $SKIP ; then
+    echo "File missing: $SKIP - try 'zig build'"
+    exit 1
+fi
+
 echo "> skip a line when reading from stdin"
 INPUT=$(cat<<EOF
 line 1
@@ -9,8 +17,8 @@ line 2
 EOF
 )
 echo "line 2" > test.expect
-echo "$INPUT" | ./skip 1 > test.out
-diff --brief test.expect test.out
+echo "$INPUT" | $SKIP 1 > test.out
+$DIFF test.expect test.out
 rm test.expect test.out
 
 echo "> skip a line when reading from a file"
@@ -19,8 +27,8 @@ line 1
 line 2
 EOF
 echo "line 2" > test.expect
-./skip 1 test.in > test.out
-diff --brief test.expect test.out
+$SKIP 1 test.in > test.out
+$DIFF test.expect test.out
 rm test.expect test.out
 
 echo "> skip until 2 matching lines seen"
@@ -37,8 +45,8 @@ alpha
 gamma
 alpha
 EOF
-./skip 2 test.in --line alpha > test.out
-diff --brief test.expect test.out
+$SKIP 2 test.in --line alpha > test.out
+$DIFF test.expect test.out
 rm test.in test.expect test.out
 
 echo "> skip lines until 2 tokens seen"
@@ -58,8 +66,8 @@ quis nostrud exercitation ullamco
 laboris nisi ut aliquip ex ea 
 commodo consequat. 
 EOF
-./skip 2 test.in --token dolor > test.out 2
-diff --brief test.expect test.out
+$SKIP 2 test.in --token dolor > test.out 2
+$DIFF test.expect test.out
 rm test.in test.expect test.out
 
 echo "> handle unknown parameter with simple error message"
@@ -69,9 +77,9 @@ EOF
 cat<<EOF > test.expect
 EOF
 touch test.out test.err
-./skip --foo > test.out 2> test.err
-diff --brief test.expect test.out
-diff --brief test.expect.err test.err
+$SKIP --foo > test.out 2> test.err
+$DIFF test.expect test.out
+$DIFF test.expect.err test.err
 rm test.expect test.out
 rm test.expect.err test.err
 
@@ -82,9 +90,9 @@ EOF
 cat<<EOF > test.expect
 EOF
 touch test.out test.err
-./skip --ignore-extras > test.out 2> test.err
-diff --brief test.expect test.out
-diff --brief test.expect.err test.err
+$SKIP --ignore-extras > test.out 2> test.err
+$DIFF test.expect test.out
+$DIFF test.expect.err test.err
 rm test.expect test.out
 rm test.expect.err test.err
 
@@ -104,8 +112,8 @@ quis nostrud exercitation ullamco
 laboris nisi ut aliquip ex ea 
 commodo consequat. 
 EOF
-./skip 4 test.in --token m --ignore-extras > test.out
-diff --brief test.expect test.out
+$SKIP 4 test.in --token m --ignore-extras > test.out
+$DIFF test.expect test.out
 rm test.in test.expect test.out
 
 echo done
