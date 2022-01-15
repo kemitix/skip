@@ -3,7 +3,7 @@
 set -e
 
 SKIP="./zig-out/bin/skip"
-DIFF="diff -u"
+DIFF="diff -u --color"
 
 if test ! -x $SKIP ; then
     echo "File missing: $SKIP - try 'zig build'"
