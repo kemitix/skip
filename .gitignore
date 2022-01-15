@@ -5,3 +5,4 @@ deps.zig
 /test.in
 /test.out
 /test.expect
+/dist
