@@ -144,26 +144,23 @@ fn dumpInput(config: Config, in: fs.File, out: fs.File, allocator: mem.Allocator
     var c: usize = 0;
     while (c < config.lines) {
         const line = it.next();
-        if (config.line) |match| {
-            if (line) |memory| {
+        if (line) |memory| {
+            if (config.line) |match| {
                 if (mem.eql(u8, match, memory)) {
                     c += 1;
                 }
-            }
-        } else {
-            if (config.token) |token| {
-                if (line) |memory| {
-                    if (config.ignoreExtras) {
+            } else {
+                if (config.token) |token| {
+                    const occurances = mem.count(u8, memory, token);
+                    if (config.ignoreExtras and occurances > 0) {
                         c += 1;
                     } else {
-                        c += mem.count(u8, memory, token);
+                        c += occurances;
                     }
+                } else {
+                    c += 1;
                 }
-            } else {
-                c += 1;
             }
-        }
-        if (line) |memory| {
             allocator.free(memory);
         } else return;
     }
@@ -182,6 +179,7 @@ test "dumpInput skip 1 line" {
     const config = Config{
         .lines = 1,
         .file = file,
+        .ignoreExtras = false,
     };
 
     try dumpInput(config, file, output, testing.allocator);
@@ -212,6 +210,7 @@ test "dumpInput skip 2 line 'alpha'" {
         .lines = 2,
         .file = file,
         .line = "alpha",
+        .ignoreExtras = false,
     };
 
     try dumpInput(config, file, output, testing.allocator);
