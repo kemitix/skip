@@ -11,12 +11,6 @@ const clap = @import("clap");
 
 const version = "0.1.0";
 
-// step 1: [x] read in a file from stdin and write out to stdout
-// step 2: [x] read in a named file in parameters and write out to stdout
-// step 3: [x] skip a number of lines
-// step 4: [ ] skip a number of matching lines
-// step 5: [ ] skip a number of tokens
-
 const maxLineLength = 4096;
 
 pub fn main() anyerror!void {
@@ -52,6 +46,7 @@ const Config = struct {
     file: ?fs.File,
     line: ?[]const u8 = null,
     token: ?[]const u8 = null,
+    ignoreExtras: bool,
 
     pub fn deinit(self: @This()) void {
         if (self.file) |f| {
@@ -62,17 +57,18 @@ const Config = struct {
 
 fn parseArgs(allocator: mem.Allocator) !Config {
     const params = comptime [_]clap.Param(clap.Help) {
-        clap.parseParam("<N>               The number of lines to skip") catch unreachable,
-        clap.parseParam("[<FILE>]          The file to read or stdin if not given") catch unreachable,
-        clap.parseParam("-l, --line <STR>  Skip until N lines matching this") catch unreachable,
-        clap.parseParam("-t, --token <STR> Skip lines until N tokens found") catch unreachable,
-        clap.parseParam("-h, --help        Display this help and exit") catch unreachable,
-        clap.parseParam("-v, --version     Display the version") catch unreachable,
+        clap.parseParam("<N>                 The number of lines to skip") catch unreachable,
+        clap.parseParam("[<FILE>]            The file to read or stdin if not given") catch unreachable,
+        clap.parseParam("-l, --line <STR>    Skip until N lines matching this") catch unreachable,
+        clap.parseParam("-t, --token <STR>   Skip lines until N tokens found") catch unreachable,
+        clap.parseParam("-i, --ignore-extras Only count the first token on each line") catch unreachable,
+        clap.parseParam("-h, --help          Display this help and exit") catch unreachable,
+        clap.parseParam("-v, --version       Display the version") catch unreachable,
     };
     var diag = clap.Diagnostic{};
     var args = clap.parse(clap.Help, &params, .{ .diagnostic = &diag }) catch |err| {
         diag.report(io.getStdErr().writer(), err) catch {};
-        return err;
+        return error.BadArgs;
     };
     defer args.deinit();
 
@@ -103,6 +99,15 @@ fn parseArgs(allocator: mem.Allocator) !Config {
     if (args.option("--token")) |match| {
         token = try allocator.dupe(u8, match);
     }
+    var ignoreExtras: bool = false;
+    if (args.flag("--ignore-extras")) {
+        if (token) |_| {
+            ignoreExtras = true;
+        } else {
+            try io.getStdErr().writer().print("Error: --ignore-extras requires --token\n", .{});
+            return error.BadArgs;
+        }
+    }
 
     var n: u32 = 0;
     var file: ?fs.File = null;
@@ -128,6 +133,7 @@ fn parseArgs(allocator: mem.Allocator) !Config {
         .file = file,
         .line = line,
         .token = token,
+        .ignoreExtras = ignoreExtras,
     };
 }
 
@@ -138,22 +144,23 @@ fn dumpInput(config: Config, in: fs.File, out: fs.File, allocator: mem.Allocator
     var c: usize = 0;
     while (c < config.lines) {
         const line = it.next();
-        if (config.line) |match| {
-            if (line) |memory| {
+        if (line) |memory| {
+            if (config.line) |match| {
                 if (mem.eql(u8, match, memory)) {
                     c += 1;
                 }
-            }
-        } else {
-            if (config.token) |token| {
-                if (line) |memory| {
-                    c += mem.count(u8, memory, token);
-                }
             } else {
-                c += 1;
+                if (config.token) |token| {
+                    const occurances = mem.count(u8, memory, token);
+                    if (config.ignoreExtras and occurances > 0) {
+                        c += 1;
+                    } else {
+                        c += occurances;
+                    }
+                } else {
+                    c += 1;
+                }
             }
-        }
-        if (line) |memory| {
             allocator.free(memory);
         } else return;
     }
@@ -172,6 +179,7 @@ test "dumpInput skip 1 line" {
     const config = Config{
         .lines = 1,
         .file = file,
+        .ignoreExtras = false,
     };
 
     try dumpInput(config, file, output, testing.allocator);
@@ -202,6 +210,7 @@ test "dumpInput skip 2 line 'alpha'" {
         .lines = 2,
         .file = file,
         .line = "alpha",
+        .ignoreExtras = false,
     };
 
     try dumpInput(config, file, output, testing.allocator);

@@ -42,6 +42,8 @@ line 4
 
 ### Skip until a number of matching lines
 
+The whole line must match.
+
 This example reads the named file.
 
 File: `input.txt`
@@ -67,7 +69,9 @@ gamma
 alpha
 ```
 
-### Skip lines until a number of tokens as seen
+### Skip lines until a number of tokens are seen
+
+Looks for a string within a line, counting each occurance.
 
 This example reads the file from stdin.
 
@@ -99,3 +103,44 @@ commodo consequat.
 
 It matches the first `dolor` on line 1,
  and the second on line 4 as part of the word `dolore`.
+
+### Skip lines until a lines with tokens are seen
+
+Looks for a string within a line, only counting each matching line once.
+
+This example reads the file from stdin.
+
+File: `input.txt`
+
+```text
+Lorem ipsum dolor sit amet, 
+consectetur adipiscing elit, 
+sed do eiusmod tempor incididunt 
+ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, 
+quis nostrud exercitation ullamco 
+laboris nisi ut aliquip ex ea 
+commodo consequat. 
+```
+
+```bash
+cat input.txt | skip 4 --token m --ignore-extras
+```
+
+Will output:
+
+```text
+quis nostrud exercitation ullamco 
+laboris nisi ut aliquip ex ea 
+commodo consequat. 
+```
+
+Without `--ignore-extras`, it would have found the fourth `m` on line 3, and displayed:
+
+```text
+ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, 
+quis nostrud exercitation ullamco 
+laboris nisi ut aliquip ex ea 
+commodo consequat. 
+```
